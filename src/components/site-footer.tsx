@@ -102,6 +102,8 @@ export function SiteFooter() {
           {version && <UpdateTip update={upstreamUpdate} />}
         </a>
         {' · '}
+        <a href="https://github.com/pythontha/LibreTV" target="_blank" rel="noopener noreferrer" className="hover:text-accent">此站源码</a>
+        {' · '}
         AGPL-3.0 License
       </p>
     </footer>

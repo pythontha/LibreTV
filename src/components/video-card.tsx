@@ -7,6 +7,7 @@ import { useAppStore, readQualities } from '@/lib/store';
 import { QUALITY_FAIL_TTL_MS, qualityKey, qualityLabel } from '@/lib/quality';
 import { formatRemarks, inferGroupRemarks } from '@/lib/remarks';
 import { cn } from '@/lib/utils';
+import type { RatingResult } from '@/lib/ratings';
 import { SmartImage } from './smart-image';
 
 // —— 跨源同名聚合 ——
@@ -115,11 +116,15 @@ export function AggregatedCard({
   group,
   onOpen,
   sources,
+  rating,
+  ratingLoading,
 }: {
   group: AggregatedGroup;
   onOpen: (item: SearchResultItem) => void;
   /** 完整源配置：探测画质需要 source.url / source.detail，搜索结果里只带 sourceUrl */
   sources?: SourceConfig[];
+  rating?: RatingResult;
+  ratingLoading?: boolean;
 }) {
   const imageProxyMode = useAppStore((s) => s.imageProxyMode);
   const customImageProxy = useAppStore((s) => s.customImageProxy);
@@ -329,6 +334,24 @@ export function AggregatedCard({
               {adult && <span className="tag bg-pink-500/15 text-pink-600 dark:text-pink-400">(18+)</span>}
             </div>
             <p className="text-xs text-muted line-clamp-2 mb-2">{group.remarks || '暂无介绍'}</p>
+            <div className="text-xs mb-2">
+              {rating?.rating ? (
+                <a
+                  href={`https://movie.douban.com/subject/${rating.rating.id}/`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="text-amber-600 dark:text-amber-400 hover:underline"
+                  title={`${rating.rating.title}（${rating.rating.year}） · ${rating.rating.count.toLocaleString()} 人评价 · 更新于 ${new Date(rating.rating.checkedAt).toLocaleDateString()}`}
+                  aria-label={`豆瓣评分 ${rating.rating.score.toFixed(1)}，查看 ${rating.rating.title}`}
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                >
+                  ★ 豆瓣 {rating.rating.score.toFixed(1)}
+                  <span className="text-faint ml-1">({rating.rating.count.toLocaleString()} 人)</span>
+                </a>
+              ) : (
+                <span className="text-faint">{ratingLoading ? '豆瓣评分加载中…' : rating?.status === 'unavailable' ? '评分暂不可用' : '暂无豆瓣评分'}</span>
+              )}
+            </div>
           </div>
           <div className="flex items-center justify-between mt-auto pt-1.5 border-t border-line">
             <span className="tag bg-chip text-muted truncate max-w-[80%]">

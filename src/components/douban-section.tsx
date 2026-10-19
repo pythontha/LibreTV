@@ -12,15 +12,63 @@ const MOVIE_TAGS = ['热门', '最新', '经典', '豆瓣高分', '冷门佳片'
 const TV_TAGS = ['热门', '美剧', '英剧', '韩剧', '日剧', '国产剧', '港剧', '日本动画', '综艺', '纪录片'];
 const WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 
-/** 首页推荐区：数据源由设置决定（豆瓣热门 / Bangumi 新番放送 / 影视热榜），二选一展示 */
+/** 首页推荐区：综合分栏或单个数据源。 */
 export function RecommendSection({ onPick }: { onPick: (title: string) => void }) {
   const doubanEnabled = useAppStore((s) => s.doubanEnabled);
   const recommendSource = useAppStore((s) => s.recommendSource);
 
   if (!doubanEnabled) return null;
+  if (recommendSource === 'mixed') return <MixedView onPick={onPick} />;
   if (recommendSource === 'bangumi') return <BangumiView onPick={onPick} />;
   if (recommendSource === 'hot-list') return <HotListView onPick={onPick} />;
   return <DoubanView onPick={onPick} />;
+}
+
+const SHELVES = [
+  { id: 'douban_tv_global', title: '海外剧周榜', description: '豆瓣海外剧集口碑与热度' },
+  { id: 'douban_tv_chinese', title: '国产剧周榜', description: '近期国产剧集推荐' },
+  { id: 'douban_movie_weekly', title: '电影周榜', description: '本周热门电影' },
+  { id: 'high-rated', title: '高分电影', description: '豆瓣高分分类，发现值得补看的作品' },
+];
+
+function MixedView({ onPick }: { onPick: (title: string) => void }) {
+  return (
+    <section aria-label="综合推荐" className="space-y-8">
+      <div>
+        <h2 className="font-semibold text-content">发现好片</h2>
+        <p className="text-xs text-faint mt-1">公开榜单与高分推荐 · 点击封面搜索片源 · 可在设置中切换推荐数据源</p>
+      </div>
+      {SHELVES.map((shelf) => <RecommendationShelf key={shelf.id} shelf={shelf} onPick={onPick} />)}
+    </section>
+  );
+}
+
+function RecommendationShelf({ shelf, onPick }: { shelf: typeof SHELVES[number]; onPick: (title: string) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const query = useQuery({
+    queryKey: ['recommendation-shelf', shelf.id],
+    queryFn: ({ signal }) => shelf.id === 'high-rated' ? api.douban('movie', '豆瓣高分', 0, 32, signal) : api.hotList(shelf.id, signal),
+    staleTime: 600_000, retry: 1,
+  });
+  const items = query.data?.items ?? [];
+  return (
+    <section aria-label={shelf.title}>
+      <div className="flex items-center justify-between mb-3 gap-3">
+        <div>
+          <h3 className="font-semibold text-content text-sm">{shelf.title}</h3>
+          <p className="text-xs text-faint mt-1">{shelf.description}</p>
+        </div>
+        {items.length > 8 && <button className="btn-ghost btn-sm shrink-0" onClick={() => setExpanded(!expanded)}>{expanded ? '收起' : '更多'}</button>}
+      </div>
+      {query.isPending ? <GridSkeleton count={8} /> : query.isError ? (
+        <div className="rounded-lg bg-chip p-4 text-xs text-muted">此栏目暂时无法加载 <button className="text-accent ml-2" onClick={() => void query.refetch()}>重试</button></div>
+      ) : items.length === 0 ? <p className="text-xs text-faint py-4">暂无推荐</p> : (
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5">
+          {(expanded ? items : items.slice(0, 8)).map((item) => <DoubanCard key={item.id} item={item} onClick={() => onPick(item.title)} />)}
+        </div>
+      )}
+    </section>
+  );
 }
 
 /**
@@ -182,10 +230,10 @@ function HotListView({ onPick }: { onPick: (title: string) => void }) {
   );
 }
 
-function GridSkeleton() {
+function GridSkeleton({ count = 16 }: { count?: number }) {
   return (
     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5">
-      {Array.from({ length: 16 }).map((_, i) => (
+      {Array.from({ length: count }).map((_, i) => (
         <div key={i}>
           <div className="aspect-[2/3] rounded-lg bg-chip animate-pulse" />
           <div className="h-3 mt-2 rounded bg-chip animate-pulse" />

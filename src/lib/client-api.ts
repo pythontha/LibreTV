@@ -1,5 +1,7 @@
 'use client';
 
+import type { RatingQuery, RatingResult } from './ratings';
+
 import type { SearchResponse, SearchStreamEvent, SourceSearchOutcome, VideoDetail, DoubanResponse, BangumiCalendarResponse, AuthStatusResponse, SourceConfig, SearchResultItem, LivePlaylistResponse, LiveEpgResponse, SourceListPayload, QualityProbeItem, QualityProbeResult } from './types';
 
 /**
@@ -107,6 +109,10 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   status: () => request<AuthStatusResponse>('/api/status'),
+
+  ratings: (items: RatingQuery[], signal?: AbortSignal) => request<{ results: RatingResult[] }>('/api/ratings', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }), signal,
+  }),
 
   login: (password: string) =>
     request<{ success: boolean }>('/api/auth', {

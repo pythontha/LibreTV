@@ -19,7 +19,7 @@ export interface AppSettings {
   adFilter: boolean;
   doubanEnabled: boolean;
   /** 首页推荐数据源：豆瓣热门 / Bangumi 每日放送（免 key）/ 影视热榜（60s API） */
-  recommendSource: 'douban' | 'bangumi' | 'hot-list';
+  recommendSource: 'douban' | 'bangumi' | 'hot-list' | 'mixed';
   /** 用户是否在设置中主动选择过推荐数据源；为 false 时部署者的 DEFAULT_RECOMMEND_SOURCE 默认值可生效 */
   recommendSourceTouched: boolean;
   autoplayNext: boolean;

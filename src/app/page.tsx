@@ -16,6 +16,8 @@ import { useToast } from '@/components/toast';
 import { EmptyState } from '@/components/states';
 import { Icon } from '@/components/icon';
 import { SiteFooter } from '@/components/site-footer';
+import { filterRatedGroups, ratingKey } from '@/lib/ratings';
+import { useSearchRatings } from '@/lib/use-search-ratings';
 
 /**
  * 首页：搜索（URL ?s= 驱动，可后退/分享）+ 豆瓣推荐。
@@ -160,8 +162,13 @@ function HomeContent() {
 
   // 分批渲染：新一次搜索（groups 变化）时重置回首批
   const [visibleCount, setVisibleCount] = useState(RESULT_PAGE_SIZE);
-  const visibleGroups = useMemo(() => groups.slice(0, visibleCount), [groups, visibleCount]);
+  const [ratingSort, setRatingSort] = useState<'relevance' | 'rating'>('relevance');
+  const [minimumRating, setMinimumRating] = useState(0);
+  const loadedGroups = useMemo(() => groups.slice(0, visibleCount), [groups, visibleCount]);
+  const scores = useSearchRatings(loadedGroups, Boolean(urlQuery) && !isSearching && groups.length > 0);
+  const visibleGroups = filterRatedGroups(loadedGroups, scores.ratings, ratingSort, minimumRating);
   useEffect(() => setVisibleCount(RESULT_PAGE_SIZE), [groups]);
+  useEffect(() => { setMinimumRating(0); setRatingSort('relevance'); }, [urlQuery]);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -330,12 +337,41 @@ function HomeContent() {
               <NoSourceGuide hasSources={customAPIs.length > 0 || envSources.length > 0} />
             ) : list.length > 0 ? (
               <>
+                <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg bg-chip px-3 py-2 text-xs">
+                  <label className="flex items-center gap-2">
+                    排序
+                    <select aria-label="搜索结果排序" className="rounded bg-surface-raised px-2 py-1 text-content" value={ratingSort}
+                      onChange={(e) => setRatingSort(e.target.value as 'relevance' | 'rating')}>
+                      <option value="relevance">默认顺序</option>
+                      <option value="rating">豆瓣评分从高到低</option>
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    豆瓣评分
+                    <select aria-label="最低豆瓣评分" className="rounded bg-surface-raised px-2 py-1 text-content" value={minimumRating}
+                      onChange={(e) => setMinimumRating(Number(e.target.value))}>
+                      <option value={0}>全部评分</option>
+                      <option value={7}>7 分以上</option>
+                      <option value={8}>8 分以上</option>
+                      <option value={9}>9 分以上</option>
+                    </select>
+                  </label>
+                  <span role="status" className="text-faint">
+                    {scores.loading ? '正在补充评分…' : `已匹配 ${[...scores.ratings.values()].filter((r) => r.rating).length} 部评分`}
+                    {minimumRating > 0 && ` · 当前显示 ${visibleGroups.length} 部`}
+                  </span>
+                  {scores.failed && <button className="text-accent hover:underline" onClick={scores.retry}>部分评分暂不可用，稍后重试</button>}
+                </div>
+                {groups.length > loadedGroups.length && <p className="text-xs text-faint mb-3">评分排序与筛选适用于已加载的 {loadedGroups.length} 部影片，加载更多可扩大范围。</p>}
+                {!scores.loading && visibleGroups.length === 0 && <p className="text-center text-sm text-faint py-8">已加载影片中没有符合评分条件的结果，可切换“全部评分”或加载更多。</p>}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
                   {visibleGroups.map((group) => (
                     <AggregatedCard
                       key={group.key}
                       group={group}
                       sources={selectedSources}
+                      rating={scores.ratings.get(ratingKey({ title: group.name, year: /^(18|19|20|21)\d{2}$/.test(group.year ?? '') ? group.year : undefined }))}
+                      ratingLoading={isSearching || (scores.loading && !scores.ratings.has(ratingKey({ title: group.name, year: group.year })))}
                       onOpen={(item) => setDetailItem(item)}
                     />
                   ))}

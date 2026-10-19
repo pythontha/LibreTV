@@ -1,5 +1,14 @@
 # LibreTV
 
+本仓库是 [pythontha/LibreTV](https://github.com/pythontha/LibreTV) 的自用增强版，基于 [LibreSpark/LibreTV](https://github.com/LibreSpark/LibreTV)。2026-10-19 新增搜索结果豆瓣评分与综合推荐，继续使用 AGPL-3.0-or-later 许可证。
+
+- 搜索结果按片名、年份、季数匹配豆瓣评分，显示评价人数，支持评分排序及 7/8/9 分筛选。评分异步加载；无可靠匹配、尚未评分或接口不可用时不赋分。评分排序与筛选仅作用于已加载的结果，可用“加载更多”扩大范围。
+- 设置 → 首页 → 推荐数据源中新增“综合推荐”，同时展示海外剧周榜、国产剧周榜、电影周榜及豆瓣高分电影。各栏目独立加载、重试，不依赖个人观影画像。
+- 部署时可设置 `DEFAULT_RECOMMEND_SOURCE=mixed`，作为未主动选择过推荐数据源的浏览器默认值。现有浏览器已主动选择过时，请在设置中切换；不会覆盖其选择。
+- 搜索评分通过服务器直连豆瓣公开接口，无需 API key；接口可能限流或变化。服务端最多并发 3 个查询、合并重复请求；成功缓存 24 小时，无匹配缓存 6 小时，暂时失败缓存 30 秒。点击评分可核对豆瓣原条目及悬浮提示中的更新时间。
+
+**运行本 fork 请从本仓库源码执行 `npm ci`、`npm run build`、`npm start`，或 `docker compose up -d --build`。下文上游发布的现成镜像不包含本 fork 的改动。访问密码、片源和本机配置保存在 `.env.local`，不要提交到 GitHub。**
+
 LibreTV Next.js 迁移版：免费在线视频聚合搜索与观看平台。基于 Next.js 15（App Router）+ TypeScript + Tailwind CSS，播放内核为 ArtPlayer + hls.js，支持亮暗双主题。
 
 > 🏠 **官网**：[LibreTV 官网](https://libretv.is-an.org/)
@@ -56,7 +65,7 @@ services:
       # - DEFAULT_SOURCES=[{"name":"示例源","url":"https://example.com/api.php/provide/vod"}]
       # - DEFAULT_LIVE_SOURCES=[{"name":"示例直播源","url":"https://example.com/list.m3u"}]
       # - DEFAULT_SUBSCRIPTIONS=["https://example.com/sources.json"]  # 预置订阅，自动导入点播源+直播源
-      # - DEFAULT_RECOMMEND_SOURCE=douban  # 首页推荐数据源默认值（douban/bangumi/hot-list），仅对未主动选择过的用户生效
+      # - DEFAULT_RECOMMEND_SOURCE=douban  # 首页推荐数据源默认值（douban/bangumi/hot-list/mixed），仅对未主动选择过的用户生效
       # - LIVE_ALLOW_PRIVATE=1              # 自建内网 IPTV 源时开启
 ```
 
@@ -100,7 +109,7 @@ PASSWORD=your-password npm start   # 监听 8080
 | `60S_API_BASE` | 否 | 影视榜单推荐源（60s API）实例地址，默认 `https://60s.crystelf.top`；有限流，高频使用可[自部署](https://github.com/vikiboss/60s) |
 | `DEFAULT_LIVE_SOURCES` | 否 | 预置直播源（M3U 订阅），JSON 数组：`[{"name":"源名","url":"https://.../list.m3u","epg":"https://.../epg.xml.gz"}]`，`epg` 为可选的 XMLTV 节目单地址 |
 | `DEFAULT_SUBSCRIPTIONS` | 否 | 预置数据源订阅（LibreTV-SourceList JSON 链接，也接受 TVBOX 配置地址），JSON 数组：`["https://.../sources.json", {"url":"https://.../list.json","name":"名称"}]`。首次访问自动导入点播源与直播源，之后每 24h 静默刷新；用户删除后不再自动加回 |
-| `DEFAULT_RECOMMEND_SOURCE` | 否 | 首页推荐数据源的默认值（`douban` / `bangumi` / `hot-list`，出厂默认 `hot-list`）；仅对未在设置中主动选择过的用户生效，用户的选择始终优先 |
+| `DEFAULT_RECOMMEND_SOURCE` | 否 | 首页推荐数据源的默认值（`douban` / `bangumi` / `hot-list` / `mixed`，出厂默认 `hot-list`）；仅对未在设置中主动选择过的用户生效，用户的选择始终优先 |
 | `LIVE_ALLOW_PRIVATE` | 否 | 设为 `1` 时允许直播流代理访问内网/保留地址（自建 IPTV 场景），默认关闭以维持 SSRF 防护 |
 
 ## 使用说明

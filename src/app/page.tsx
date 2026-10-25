@@ -17,6 +17,7 @@ import { EmptyState } from '@/components/states';
 import { Icon } from '@/components/icon';
 import { SiteFooter } from '@/components/site-footer';
 import { filterRatedGroups, ratingKey } from '@/lib/ratings';
+import { filterGroupsByCategories, getCategoryOptions, pruneCategories } from '@/lib/category-filter';
 import { useSearchRatings } from '@/lib/use-search-ratings';
 
 /**
@@ -164,11 +165,45 @@ function HomeContent() {
   const [visibleCount, setVisibleCount] = useState(RESULT_PAGE_SIZE);
   const [ratingSort, setRatingSort] = useState<'relevance' | 'rating'>('relevance');
   const [minimumRating, setMinimumRating] = useState(0);
-  const loadedGroups = useMemo(() => groups.slice(0, visibleCount), [groups, visibleCount]);
-  const scores = useSearchRatings(loadedGroups, Boolean(urlQuery) && !isSearching && groups.length > 0);
+  // 类别多选筛选：空集合代表「全部」。筛选直接作用在聚合结果上，
+  // 这样计数、分批加载与「加载更多」都按筛选后的数量计算，不必先翻完所有批次
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(() => new Set());
+  const categoryOptions = useMemo(() => getCategoryOptions(groups), [groups]);
+  const categoryGroups = useMemo(
+    () => filterGroupsByCategories(groups, selectedCategories),
+    [groups, selectedCategories]
+  );
+  const loadedGroups = useMemo(
+    () => categoryGroups.slice(0, visibleCount),
+    [categoryGroups, visibleCount]
+  );
+  const scores = useSearchRatings(
+    loadedGroups,
+    Boolean(urlQuery) && !isSearching && categoryGroups.length > 0
+  );
   const visibleGroups = filterRatedGroups(loadedGroups, scores.ratings, ratingSort, minimumRating);
-  useEffect(() => setVisibleCount(RESULT_PAGE_SIZE), [groups]);
-  useEffect(() => { setMinimumRating(0); setRatingSort('relevance'); }, [urlQuery]);
+  const toggleCategory = (name: string) =>
+    setSelectedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  const clearCategories = () => setSelectedCategories(new Set());
+  useEffect(() => setVisibleCount(RESULT_PAGE_SIZE), [groups, selectedCategories]);
+  useEffect(() => {
+    setMinimumRating(0);
+    setRatingSort('relevance');
+    setSelectedCategories(new Set());
+  }, [urlQuery]);
+  // 结果集变化后丢弃已消失的类别（换关键词、源失败都会让选项变），
+  // 否则残留的旧条件会把列表筛成空的
+  useEffect(() => {
+    setSelectedCategories((prev) => {
+      const next = pruneCategories(prev, categoryOptions);
+      return next.size === prev.size ? prev : next;
+    });
+  }, [categoryOptions]);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -337,7 +372,8 @@ function HomeContent() {
               <NoSourceGuide hasSources={customAPIs.length > 0 || envSources.length > 0} />
             ) : list.length > 0 ? (
               <>
-                <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg bg-chip px-3 py-2 text-xs">
+                <div className="mb-4 rounded-lg bg-chip px-3 py-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-3">
                   <label className="flex items-center gap-2">
                     排序
                     <select aria-label="搜索结果排序" className="rounded bg-surface-raised px-2 py-1 text-content" value={ratingSort}
@@ -358,12 +394,37 @@ function HomeContent() {
                   </label>
                   <span role="status" className="text-faint">
                     {scores.loading ? '正在补充评分…' : `已匹配 ${[...scores.ratings.values()].filter((r) => r.rating).length} 部评分`}
-                    {minimumRating > 0 && ` · 当前显示 ${visibleGroups.length} 部`}
+                    {(minimumRating > 0 || selectedCategories.size > 0) && ` · 当前显示 ${visibleGroups.length} 部`}
                   </span>
                   {scores.failed && <button className="text-accent hover:underline" onClick={scores.retry}>部分评分暂不可用，稍后重试</button>}
+                  </div>
+                  {categoryOptions.length > 1 && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2" role="group" aria-label="按类别筛选搜索结果">
+                      <span className="text-faint">类别</span>
+                      <CategoryChip active={selectedCategories.size === 0} onClick={clearCategories}>
+                        全部
+                      </CategoryChip>
+                      {categoryOptions.map((option) => (
+                        <CategoryChip
+                          key={option.name}
+                          active={selectedCategories.has(option.name)}
+                          onClick={() => toggleCategory(option.name)}
+                        >
+                          {option.name}
+                          <span className="ml-1 opacity-60">{option.count}</span>
+                        </CategoryChip>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                {groups.length > loadedGroups.length && <p className="text-xs text-faint mb-3">评分排序与筛选适用于已加载的 {loadedGroups.length} 部影片，加载更多可扩大范围。</p>}
-                {!scores.loading && visibleGroups.length === 0 && <p className="text-center text-sm text-faint py-8">已加载影片中没有符合评分条件的结果，可切换“全部评分”或加载更多。</p>}
+                {categoryGroups.length > loadedGroups.length && <p className="text-xs text-faint mb-3">评分排序与筛选适用于已加载的 {loadedGroups.length} 部影片，加载更多可扩大范围。</p>}
+                {!scores.loading && visibleGroups.length === 0 && (
+                  <p className="text-center text-sm text-faint py-8">
+                    {selectedCategories.size > 0 && categoryGroups.length === 0
+                      ? '所选类别下没有影片，点击「全部」可恢复。'
+                      : '已加载影片中没有符合评分条件的结果，可切换“全部评分”或加载更多。'}
+                  </p>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
                   {visibleGroups.map((group) => (
                     <AggregatedCard
@@ -376,13 +437,13 @@ function HomeContent() {
                     />
                   ))}
                 </div>
-                {groups.length > visibleCount && (
+                {categoryGroups.length > visibleCount && (
                   <div className="flex justify-center mt-4">
                     <button
                       className="btn-ghost btn-sm"
                       onClick={() => setVisibleCount((v) => v + RESULT_PAGE_SIZE)}
                     >
-                      加载更多（还有 {groups.length - visibleCount} 部）
+                      加载更多（还有 {categoryGroups.length - visibleCount} 部）
                     </button>
                   </div>
                 )}
@@ -415,6 +476,31 @@ function HomeContent() {
 
       <DetailModal item={detailItem} onClose={() => setDetailItem(null)} />
     </div>
+  );
+}
+
+/** 类别筛选胶囊：多选，aria-pressed 表达状态，键盘可直接 Tab + 回车切换 */
+function CategoryChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        'px-2.5 py-1 rounded-full transition-colors',
+        active ? 'bg-accent text-on-accent' : 'bg-surface-raised text-muted hover:text-content hover:bg-hover'
+      )}
+    >
+      {children}
+    </button>
   );
 }
 

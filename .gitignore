@@ -7,6 +7,9 @@ out/
 vitest-results.json
 *.log
 
+# 本机部署状态（进程状态、日志、探源脚本，不入库）
+.local/
+
 # AI 工具产物（本机会话/缓存数据，不入库）
 .mimosa/
 .zcode/

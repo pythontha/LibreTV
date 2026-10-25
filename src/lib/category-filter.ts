@@ -9,6 +9,48 @@
 /** 采集站没有给 typeName 时的归并桶 */
 export const UNCATEGORIZED = '未分类';
 
+/**
+ * 跨站同义类别归一表（左：源站写法，右：统一后的名称）。
+ *
+ * 这张表按四个预置源（光速 / 暴风 / 量子 / 360）的真实分类词表整理，只合并
+ * 「同一件事的不同写法」与明显的错别字，不做层级合并——例如「动漫」是总类、
+ * 「国产动漫」是地区子类，两者保持独立，避免把用户明确想找的细分类别吞掉。
+ *
+ * 约束：右侧的值不得再是左侧的键（不做多级映射），由单元测试保证。
+ */
+export const CATEGORY_SYNONYMS: Readonly<Record<string, string>> = {
+  // 总类：片 / 剧 的冗余后缀
+  电影片: '电影',
+  综艺片: '综艺',
+  动漫片: '动漫',
+  动画片: '动漫',
+  连续剧: '电视剧',
+  // 剧集：地区叫法
+  大陆剧: '国产剧',
+  港澳剧: '香港剧',
+  韩国剧: '韩剧',
+  日本剧: '日剧',
+  泰国剧: '泰剧',
+  // 动漫：地区叫法
+  中国动漫: '国产动漫',
+  日本动漫: '日韩动漫',
+  // 错别字
+  记录片: '纪录片',
+  // 体育：总类
+  体育: '体育赛事',
+  // 成人向分类的两种叫法
+  理论片: '伦理片',
+  福利: '伦理片',
+  // 短剧
+  短剧大全: '短剧',
+  年代穿越: '穿越年代',
+  反转爽文: '反转爽剧',
+  女恋总裁: '言情总裁',
+  // 资讯
+  电影资讯: '新闻资讯',
+  娱乐新闻: '新闻资讯',
+};
+
 export interface CategoryItemLike {
   typeName?: string;
 }
@@ -23,15 +65,17 @@ export interface CategoryOption {
   count: number;
 }
 
-function normalizeCategory(value: string | undefined): string {
+/** 把源站写法映射到统一类别名；未收录的写法原样保留，空白归入「未分类」 */
+export function canonicalCategory(value: string | undefined): string {
   const text = (value ?? '').replace(/\s+/g, ' ').trim();
-  return text || UNCATEGORIZED;
+  if (!text) return UNCATEGORIZED;
+  return CATEGORY_SYNONYMS[text] ?? text;
 }
 
-/** 单个聚合组命中的全部类别（去重） */
+/** 单个聚合组命中的全部类别（已归一、去重） */
 export function groupCategories(group: CategoryGroupLike): string[] {
   const set = new Set<string>();
-  for (const item of group.items) set.add(normalizeCategory(item.typeName));
+  for (const item of group.items) set.add(canonicalCategory(item.typeName));
   return [...set];
 }
 

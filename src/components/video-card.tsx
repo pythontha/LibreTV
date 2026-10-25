@@ -8,6 +8,7 @@ import { QUALITY_FAIL_TTL_MS, qualityKey, qualityLabel } from '@/lib/quality';
 import { formatRemarks, inferGroupRemarks } from '@/lib/remarks';
 import { cn } from '@/lib/utils';
 import type { RatingResult } from '@/lib/ratings';
+import { canonicalCategory } from '@/lib/category-filter';
 import { SmartImage } from './smart-image';
 
 // —— 跨源同名聚合 ——
@@ -329,7 +330,7 @@ export function AggregatedCard({
               {group.name}
             </h3>
             <div className="flex flex-wrap gap-1 mb-1.5">
-              {group.typeName && <span className="tag bg-accent/15 text-accent">{group.typeName}</span>}
+              {group.typeName && <span className="tag bg-accent/15 text-accent">{canonicalCategory(group.typeName)}</span>}
               {group.year && <span className="tag bg-purple-500/15 text-purple-600 dark:text-purple-300">{group.year}</span>}
               {adult && <span className="tag bg-pink-500/15 text-pink-600 dark:text-pink-400">(18+)</span>}
             </div>
@@ -491,7 +492,7 @@ export function VideoCard({ item, onClick }: { item: SearchResultItem; onClick: 
               {item.name}
             </h3>
             <div className="flex flex-wrap gap-1 mb-1.5">
-              {item.typeName && <span className="tag bg-accent/15 text-accent">{item.typeName}</span>}
+              {item.typeName && <span className="tag bg-accent/15 text-accent">{canonicalCategory(item.typeName)}</span>}
               {item.year && <span className="tag bg-purple-500/15 text-purple-600 dark:text-purple-300">{item.year}</span>}
             </div>
             <p className="text-xs text-muted line-clamp-2 mb-2">{formatRemarks(item.remarks) || '暂无介绍'}</p>

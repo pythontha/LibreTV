@@ -105,6 +105,26 @@ export interface SearchResponse {
   failures: { sourceKey: string; error: string; timedOut?: boolean }[];
 }
 
+// —— 分类浏览（反向搜索） ——
+
+/** 可浏览的类别（跨源归一后的名称 + 提供该分类的源数量） */
+export interface BrowseCategory {
+  name: string;
+  sources: number;
+}
+
+export interface BrowseCategoriesResponse {
+  categories: BrowseCategory[];
+}
+
+export interface BrowseResponse {
+  list: SearchResultItem[];
+  failures: { sourceKey: string; error: string; timedOut?: boolean }[];
+  page: number;
+  /** 各源 pagecount 的最大值；1 表示只有一页或源站未提供分页信息 */
+  pageCount: number;
+}
+
 /** /api/search?stream=1 的 NDJSON 事件：逐源推送 + 最终聚合 */
 export type SearchStreamEvent =
   | ({ type: 'source' } & SourceSearchOutcome)

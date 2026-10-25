@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Header } from '@/components/header';
 import { RecommendSection } from '@/components/douban-section';
@@ -50,6 +51,8 @@ function HomeContent() {
   const subscriptions = useAppStore((s) => s.subscriptions);
   const [input, setInput] = useState(urlQuery);
   const [detailItem, setDetailItem] = useState<SearchResultItem | null>(null);
+  /** 首页「分类浏览」默认收起：拉分类目录要打 4 次 ac=list，没必要在首屏白付这份延迟 */
+  const [showCategories, setShowCategories] = useState(false);
   /** 流式搜索中已结算的源（data 就绪前用于增量渲染） */
   const [streamedOutcomes, setStreamedOutcomes] = useState<SourceSearchOutcome[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -121,6 +124,15 @@ function HomeContent() {
 
   // 最近搜索改为搜索框下拉（聚焦展开、按输入过滤），不再常驻首屏
   const searchHistory = useSearchHistory(input);
+
+  // 分类目录：仅在首页、用户展开且已勾选源时拉取
+  const browseCategoriesQuery = useQuery({
+    queryKey: ['browse-categories', selectedKeys],
+    queryFn: ({ signal }) => api.browseCategories(selectedSources, signal),
+    enabled: !urlQuery && showCategories && selectedSources.length > 0,
+    staleTime: 10 * 60 * 1000,
+  });
+  const browseCategories = browseCategoriesQuery.data?.categories ?? [];
 
   const runSearch = (q: string) => {
     const query = q.trim().slice(0, 100);
@@ -321,6 +333,50 @@ function HomeContent() {
             )}
           </div>
         </section>
+
+        {/* 分类浏览入口：不看关键词，直接翻某个类别下的全部影片 */}
+        {!urlQuery && (
+          <section aria-label="分类浏览" className="mb-8 w-full max-w-2xl mx-auto">
+            <div className="flex items-center justify-between mb-2">
+              <button
+                type="button"
+                className="text-sm text-muted hover:text-content transition-colors"
+                onClick={() => setShowCategories((value) => !value)}
+                aria-expanded={showCategories}
+              >
+                分类浏览{showCategories ? '（收起）' : '（不用搜索，直接翻）'}
+              </button>
+              <Link href="/browse" className="text-xs text-accent hover:underline">
+                打开分类页 →
+              </Link>
+            </div>
+            {showCategories && (
+              <div className="flex flex-wrap gap-2">
+                {browseCategoriesQuery.isLoading
+                  ? Array.from({ length: 8 }).map((_, index) => (
+                      <div key={index} className="h-7 w-20 rounded-full bg-chip animate-pulse" />
+                    ))
+                  : browseCategories.slice(0, 16).map((item) => (
+                      <Link
+                        key={item.name}
+                        href={`/browse?cat=${encodeURIComponent(item.name)}`}
+                        className="px-3 py-1.5 rounded-full bg-chip text-xs text-muted transition-colors hover:bg-hover hover:text-content"
+                      >
+                        {item.name}
+                      </Link>
+                    ))}
+                {!browseCategoriesQuery.isLoading && browseCategories.length > 16 && (
+                  <Link
+                    href="/browse"
+                    className="px-3 py-1.5 rounded-full text-xs text-accent hover:underline"
+                  >
+                    更多 {browseCategories.length - 16} 个 →
+                  </Link>
+                )}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* 搜索结果 */}
         {urlQuery && (

@@ -2,7 +2,7 @@
 
 import type { RatingQuery, RatingResult } from './ratings';
 
-import type { SearchResponse, SearchStreamEvent, SourceSearchOutcome, VideoDetail, DoubanResponse, BangumiCalendarResponse, AuthStatusResponse, SourceConfig, SearchResultItem, LivePlaylistResponse, LiveEpgResponse, SourceListPayload, QualityProbeItem, QualityProbeResult } from './types';
+import type { SearchResponse, SearchStreamEvent, SourceSearchOutcome, VideoDetail, DoubanResponse, BangumiCalendarResponse, AuthStatusResponse, SourceConfig, SearchResultItem, LivePlaylistResponse, LiveEpgResponse, SourceListPayload, QualityProbeItem, QualityProbeResult, BrowseCategoriesResponse, BrowseResponse } from './types';
 
 /**
  * 客户端 API 封装。401 时触发全局事件打开登录框，
@@ -146,6 +146,30 @@ export const api = {
     }
     return searchStream(wd, sources, filterAdult, onSource, signal);
   },
+
+  /** 分类浏览：不带 category 时返回可选分类目录（跨源归一后） */
+  browseCategories: (sources: SourceConfig[], signal?: AbortSignal) =>
+    request<BrowseCategoriesResponse>('/api/browse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sources }),
+      signal,
+    }),
+
+  /** 分类浏览：按归一后的类别名翻页拉取该分类下的影片 */
+  browse: (
+    category: string,
+    sources: SourceConfig[],
+    page: number,
+    filterAdult: boolean,
+    signal?: AbortSignal
+  ) =>
+    request<BrowseResponse>('/api/browse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category, sources, page, filterAdult }),
+      signal,
+    }),
 
   detail: (id: string, source: SourceConfig, signal?: AbortSignal) => {
     const sp = new URLSearchParams({ id, source: JSON.stringify(source) });
